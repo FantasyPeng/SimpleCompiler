@@ -1,0 +1,9 @@
+E:\Dasanshang\编译原理\LR0\LR0\bin\Release\LR0.exe.config
+E:\Dasanshang\编译原理\LR0\LR0\bin\Release\LR0.exe
+E:\Dasanshang\编译原理\LR0\LR0\bin\Release\LR0.pdb
+E:\Dasanshang\编译原理\LR0\LR0\obj\Release\LR0.csprojResolveAssemblyReference.cache
+E:\Dasanshang\编译原理\LR0\LR0\obj\Release\LR0.Form1.resources
+E:\Dasanshang\编译原理\LR0\LR0\obj\Release\LR0.Properties.Resources.resources
+E:\Dasanshang\编译原理\LR0\LR0\obj\Release\LR0.csproj.GenerateResource.Cache
+E:\Dasanshang\编译原理\LR0\LR0\obj\Release\LR0.exe
+E:\Dasanshang\编译原理\LR0\LR0\obj\Release\LR0.pdb

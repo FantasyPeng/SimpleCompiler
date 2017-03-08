@@ -1,0 +1,1569 @@
+﻿<<<<<<< HEAD
+﻿using System;
+using System.IO;
+
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace LR0
+{
+    public partial class Form1 : Form
+    {
+        public static List<Production> lp = new List<Production>();
+        public static Dictionary<string, List<string>> d_first = new Dictionary<string, List<string>>();
+        public static Dictionary<string, List<string>> d_follow = new Dictionary<string, List<string>>();
+        public static List<Dictionary<string, string>> Table = new List<Dictionary<string, string>>();//Action和GOTO表
+        public static List<ClosureItem> ClosureI = new List<ClosureItem>();
+        public static List<Closure> ClosureP = new List<Closure>();
+        public static List<String> VN;
+        public static List<String> VT;
+        public static String beginC;
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        String grammar = "";
+        String strVT = "";
+        String strVN = "";
+        enum TYPE
+        {
+            PROC, PROG, ID, BLOCK, CONDECL, VARDECL, BODY, CONST, INTEGER, STATEMENT, EXP, LEXP, LOP, TERM, AOP, FACTOR, MOP,
+            DOU, FEN, SPACE, LEFT_P, RIGHT_P,  //各种标号 逗号 分号
+            ADD, SUB, MUL, DIV,
+            N_EQUAL, EQUAL, LESS, LESS_E, BIG, BIG_E, //大于 小于
+            FUZHI,
+            L, D, // L字母  D数字
+            // 关键字
+            myconst, program, var, procedure, begin, end, myif, then, myelse, mydo, mywhile, call, read, write, repeat, unti,
+            //辅助字
+            PCONDECL, NULL, PVARDECL, PM, PPROC, PBODY, PSTATEMENT, PSTATEMENT1,PINTEGER, PID, PTERM, PEXP, PSTATEMENT_EXP,
+            //奇怪的
+            odd, //判断奇数偶数 
+        };
+
+
+
+        //辅助字
+            PCONDECL, NULL, PVARDECL, PM, PPROC, 
+            { ((char)TYPE.PINTEGER).ToString(), "P<integer>" } ,
+            { ((char)TYPE.PID).ToString(), "P<id>" } ,
+            { ((char)TYPE.PTERM).ToString(), "P<term>" } ,
+            { ((char)TYPE.PEXP).ToString(), "P<exp>" } ,
+            { ((char)TYPE.PSTATEMENT_EXP).ToString(), "P<STATEMENT_EXP>" } ,
+            { ((char)TYPE.odd).ToString(), "odd" } ,
+
+    //<id> → l{l|d}
+            ((char)TYPE.ID).ToString() + "->" + ((char)TYPE.L).ToString() + ((char)TYPE.PID).ToString(),
+            ((char)TYPE.PID).ToString() + "->" + ((char)TYPE.L).ToString() + ((char)TYPE.PID).ToString(),
+            ((char)TYPE.PID).ToString() + "->" + ((char)TYPE.D).ToString() + ((char)TYPE.PID).ToString(),
+            ((char)TYPE.PID).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<mop> → *|/
+            ((char)TYPE.MOP).ToString() + "->" + ((char)TYPE.MUL).ToString(),
+            ((char)TYPE.MOP).ToString() + "->" + ((char)TYPE.DIV).ToString(),
+
+            //<aop> → +|-
+            ((char)TYPE.AOP).ToString() + "->" + ((char)TYPE.ADD).ToString(),
+            ((char)TYPE.AOP).ToString() + "->" + ((char)TYPE.SUB).ToString(),
+
+            //<lop> → =|<>|<|<=|>|>=
+            ((char)TYPE.LOP).ToString() + "->" + ((char)TYPE.EQUAL).ToString(),
+            ((char)TYPE.LOP).ToString() + "->" + ((char)TYPE.N_EQUAL).ToString(),
+            ((char)TYPE.LOP).ToString() + "->" + ((char)TYPE.LESS).ToString(),
+            ((char)TYPE.LOP).ToString() + "->" + ((char)TYPE.LESS_E).ToString(),
+            ((char)TYPE.LOP).ToString() + "->" + ((char)TYPE.BIG).ToString(),
+            ((char)TYPE.LOP).ToString() + "->" + ((char)TYPE.BIG_E).ToString(),
+
+            //<factor>→<id>|<integer>|(<exp>)
+            ((char)TYPE.FACTOR).ToString() + "->" + ((char)TYPE.ID).ToString(),
+            ((char)TYPE.FACTOR).ToString() + "->" + ((char)TYPE.INTEGER).ToString(),
+            ((char)TYPE.FACTOR).ToString() + "->" + ((char)TYPE.LEFT_P).ToString() + ((char)TYPE.EXP).ToString() + ((char)TYPE.RIGHT_P).ToString(),
+
+            //<term> → <factor>{<mop><factor>}
+            ((char)TYPE.TERM).ToString() + "->" + ((char)TYPE.FACTOR).ToString() + ((char)TYPE.PTERM).ToString(),
+            ((char)TYPE.PTERM).ToString() + "->" + ((char)TYPE.MOP).ToString() + ((char)TYPE.FACTOR).ToString() + ((char)TYPE.PTERM).ToString(),
+            ((char)TYPE.PTERM).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<exp> → [+|-]<term>{<aop><term>}
+            ((char)TYPE.EXP).ToString() + "->" + ((char)TYPE.ADD).ToString() + ((char)TYPE.TERM).ToString() + ((char)TYPE.PEXP).ToString(),
+            ((char)TYPE.EXP).ToString() + "->" + ((char)TYPE.SUB).ToString() + ((char)TYPE.TERM).ToString() + ((char)TYPE.PEXP).ToString(),
+            ((char)TYPE.EXP).ToString() + "->" + ((char)TYPE.TERM).ToString() + ((char)TYPE.PEXP).ToString(),
+            ((char)TYPE.PEXP).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+            ((char)TYPE.PEXP).ToString() + "->" + ((char)TYPE.AOP).ToString() + ((char)TYPE.TERM).ToString() + ((char)TYPE.PEXP).ToString(),
+
+            //<lexp> → <exp> <lop> <exp>|odd <exp>
+            ((char)TYPE.LEXP).ToString() + "->" + ((char)TYPE.EXP).ToString() + ((char)TYPE.LOP).ToString() + ((char)TYPE.EXP).ToString(),
+            ((char)TYPE.LEXP).ToString() + "->" + ((char)TYPE.odd).ToString() + ((char)TYPE.EXP).ToString(),
+
+            //<statement> → write (<exp>{,<exp>}) 
+            ((char)TYPE.STATEMENT).ToString() + "->" + ((char)TYPE.write).ToString() + ((char)TYPE.LEFT_P).ToString() + ((char)TYPE.EXP).ToString() + ((char)TYPE.PSTATEMENT_EXP).ToString() + ((char)TYPE.RIGHT_P).ToString(),
+            ((char)TYPE.PSTATEMENT_EXP).ToString() + "->" + ((char)TYPE.DOU).ToString() + ((char)TYPE.EXP).ToString() + ((char)TYPE.PSTATEMENT_EXP).ToString(),
+            ((char)TYPE.PSTATEMENT_EXP).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+
+
+
+
+
+
+        Dictionary<String, String> tmp = new Dictionary<String, string> { 
+        { ((char)TYPE.program).ToString(), "program" } ,
+        { ((char)TYPE.myconst).ToString(), "const" } ,
+        { ((char)TYPE.var).ToString(), "var" } ,
+        { ((char)TYPE.procedure).ToString(), "procedure" } ,
+        { ((char)TYPE.begin).ToString(), "begin" } ,
+        { ((char)TYPE.end).ToString(), "end" } ,
+        { ((char)TYPE.myif).ToString(), "if" } ,
+        { ((char)TYPE.then).ToString(), "then" } ,
+        { ((char)TYPE.myelse).ToString(), "else" } ,
+        { ((char)TYPE.mydo).ToString(), "do" } ,
+        { ((char)TYPE.mywhile).ToString(), "while" } ,
+        { ((char)TYPE.call).ToString(), "call" } ,
+        { ((char)TYPE.read).ToString(), "read" } ,
+        { ((char)TYPE.write).ToString(), "write" } ,
+        { ((char)TYPE.repeat).ToString(), "repeat" } ,
+        { ((char)TYPE.unti).ToString(), "unti" } ,
+
+        { ((char)TYPE.PROG).ToString(), "<prog>" } ,
+        { ((char)TYPE.PROC).ToString(), "<proc>" } ,
+        { ((char)TYPE.ID).ToString(), "<id>" } ,
+        { ((char)TYPE.BLOCK).ToString(), "<block>" } ,
+        { ((char)TYPE.CONDECL).ToString(), "<condecl>" } ,
+        { ((char)TYPE.VARDECL).ToString(), "<vardecl>" } ,
+        { ((char)TYPE.BODY).ToString(), "<body>" } ,
+        { ((char)TYPE.STATEMENT).ToString(), "<statement>" } ,
+        { ((char)TYPE.EXP).ToString(), "<exp>" } ,
+        { ((char)TYPE.CONST).ToString(), "<const>" } ,
+        { ((char)TYPE.INTEGER).ToString(), "<integer>" } ,
+        { ((char)TYPE.LEXP).ToString(), "<lexp>" } ,
+        { ((char)TYPE.LOP).ToString(), "<lop>" } ,
+        { ((char)TYPE.TERM).ToString(), "<term>" } ,
+        { ((char)TYPE.AOP).ToString(), "<aop>" } ,
+        { ((char)TYPE.FACTOR).ToString(), "<factor>" } ,
+        { ((char)TYPE.MOP).ToString(), "<mop>" } ,
+
+        { ((char)TYPE.SPACE).ToString(), " " } ,
+        { ((char)TYPE.DOU).ToString(), "," } ,
+        { ((char)TYPE.FEN).ToString(), ";" } ,
+        { ((char)TYPE.FUZHI).ToString(), ":=" } ,
+        { ((char)TYPE.ADD).ToString(), "+" } ,
+        { ((char)TYPE.SUB).ToString(), "-" } ,
+        { ((char)TYPE.MUL).ToString(), "*" } ,
+        { ((char)TYPE.DIV).ToString(), "/" } ,
+        { ((char)TYPE.LEFT_P).ToString(), "(" } ,
+        { ((char)TYPE.RIGHT_P).ToString(), ")" } ,
+        { ((char)TYPE.N_EQUAL).ToString(), "<>" } ,
+        { ((char)TYPE.EQUAL).ToString(), "=" } ,
+        { ((char)TYPE.LESS).ToString(), "<" } ,
+        { ((char)TYPE.LESS_E).ToString(), "<=" } ,
+        { ((char)TYPE.BIG).ToString(), ">" } ,
+        { ((char)TYPE.BIG_E).ToString(), ">=" } ,
+
+        { ((char)TYPE.L).ToString(), "l" } ,
+        { ((char)TYPE.D).ToString(), "d" } ,
+
+        { ((char)TYPE.PCONDECL).ToString(), "Pcondecl" } , 
+        { ((char)TYPE.NULL).ToString(), "$" } ,
+        { ((char)TYPE.PVARDECL).ToString(), "P<vardecl>" } ,
+        { ((char)TYPE.PM).ToString(), "Pm" } ,
+        { ((char)TYPE.PPROC).ToString(), "P<proc>" } ,
+        { ((char)TYPE.PBODY).ToString(), "P<body>" } ,
+        { ((char)TYPE.PSTATEMENT).ToString(), "P<statement>" } ,
+        { ((char)TYPE.PSTATEMENT1).ToString(), "P<statement>1" } ,
+        };
+        List<String> pro = new List<string>{
+            ((char)TYPE.PROG).ToString() + "->" + ((char)TYPE.program).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.FEN).ToString() + ((char)TYPE.BLOCK).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+
+            //<condecl> → const <const>{,<const>}
+            ((char)TYPE.CONDECL).ToString() + "->" + ((char)TYPE.myconst).ToString() + ((char)TYPE.CONST).ToString() + ((char)TYPE.PCONDECL).ToString(),
+            ((char)TYPE.PCONDECL).ToString() + "->" + ((char)TYPE.DOU).ToString() + ((char)TYPE.CONST).ToString() + ((char)TYPE.PCONDECL).ToString(),
+            ((char)TYPE.PCONDECL).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<const> → <id>:=<integer>
+            ((char)TYPE.CONST).ToString() + "->" + ((char)TYPE.ID).ToString() + ((char)TYPE.FUZHI).ToString() + ((char)TYPE.INTEGER).ToString(),
+
+            //<vardecl> → var <id>{,<id>}
+            ((char)TYPE.VARDECL).ToString() + "->" + ((char)TYPE.var).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.PVARDECL).ToString(),
+            ((char)TYPE.PVARDECL).ToString() + "->" + ((char)TYPE.DOU).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.PVARDECL).ToString(),
+            ((char)TYPE.PVARDECL).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<proc> → procedure <id>（[<id>{,<id>}]）;<block>{;<proc>}
+            ((char)TYPE.PROC).ToString() + "->" + ((char)TYPE.procedure).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.LEFT_P).ToString() + ((char)TYPE.PM).ToString() + ((char)TYPE.RIGHT_P).ToString() + ((char)TYPE.FEN).ToString() + ((char)TYPE.BLOCK).ToString() + ((char)TYPE.PPROC).ToString(),
+            ((char)TYPE.PPROC).ToString() + "->" + ((char)TYPE.FEN).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.PPROC).ToString(),
+            ((char)TYPE.PPROC).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+            ((char)TYPE.PM).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+            ((char)TYPE.PM).ToString() + "->" +  ((char)TYPE.ID).ToString() + ((char)TYPE.PVARDECL).ToString(),
+
+            //<body> → begin <statement>{;<statement>}end
+            ((char)TYPE.BODY).ToString() + "->" +  ((char)TYPE.begin).ToString() + ((char)TYPE.STATEMENT).ToString() + ((char)TYPE.PBODY).ToString() + ((char)TYPE.end).ToString(),
+            ((char)TYPE.PBODY).ToString() + "->" + ((char)TYPE.FEN).ToString() + ((char)TYPE.STATEMENT).ToString() + ((char)TYPE.PBODY).ToString(),
+            ((char)TYPE.PBODY).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<statement> → <id> := <exp>
+            ((char)TYPE.STATEMENT).ToString() + "->" + ((char)TYPE.ID).ToString() + ((char)TYPE.FUZHI).ToString() + ((char)TYPE.EXP).ToString(),
+            //<statement> → if <lexp> then <statement>[else <statement>]
+            ((char)TYPE.STATEMENT).ToString() + "->" + ((char)TYPE.myif).ToString() + ((char)TYPE.LEXP).ToString() + ((char)TYPE.then).ToString() + ((char)TYPE.STATEMENT).ToString(),
+            ((char)TYPE.STATEMENT).ToString() + "->" + ((char)TYPE.myif).ToString() + ((char)TYPE.LEXP).ToString() + ((char)TYPE.then).ToString() + ((char)TYPE.STATEMENT).ToString() + ((char)TYPE.myelse).ToString() + ((char)TYPE.STATEMENT).ToString(),
+            //<statement> → while <lexp> do <statement>
+            ((char)TYPE.STATEMENT).ToString() + "->" + ((char)TYPE.mywhile).ToString() + ((char)TYPE.LEXP).ToString() + ((char)TYPE.mydo).ToString() + ((char)TYPE.STATEMENT).ToString(),
+            //<statement> → call <id>[（<exp>{,<exp>}）]
+            ((char)TYPE.STATEMENT).ToString() + "->" + ((char)TYPE.call).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.PSTATEMENT).ToString(),
+            ((char)TYPE.PSTATEMENT).ToString()  + "->" + ((char)TYPE.NULL).ToString(),
+            ((char)TYPE.PSTATEMENT).ToString()  + "->" + ((char)TYPE.LEFT_P).ToString() + ((char)TYPE.EXP).ToString() + ((char)TYPE.PSTATEMENT1).ToString(),
+            ((char)TYPE.PSTATEMENT1).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+            ((char)TYPE.PSTATEMENT1).ToString() + "->" + ((char)TYPE.DOU).ToString() + ((char)TYPE.EXP).ToString() + ((char)TYPE.PSTATEMENT1).ToString(),
+             //<statement> → <body>
+            ((char)TYPE.STATEMENT).ToString()  + "->" + ((char)TYPE.BODY).ToString(),
+            //<statement> → read (<id>{，<id>})
+            ((char)TYPE.STATEMENT).ToString()  + "->" + ((char)TYPE.read).ToString() + ((char)TYPE.LEFT_P).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.PVARDECL).ToString() + ((char)TYPE.RIGHT_P).ToString(),
+
+
+        };
+        
+        //获取所有的项目，存储在 ClosureI 这个list中
+        public void getClosureItem(List<String> LineList)
+        {
+            for (int i = 0; i < pro[0].Length; i++)
+            {
+                String s = pro[0][i].ToString();
+                if ("-" == s || ">" == s)
+                {
+                    Console.WriteLine(i + " " + s);
+                }
+                else
+                    Console.WriteLine(i + ":" + tmp[s]);
+            }
+                
+            listView3.Clear();
+            ColumnHeader ch = new ColumnHeader();
+            ch.Text = "Syntax:";   //设置列标题  
+            ch.Width = 130;    //设置列宽度  
+            ch.TextAlign = HorizontalAlignment.Center;   //设置列的对齐方式  
+
+            listView3.Columns.Add(ch);    //将列头添加到ListView控件。
+            int row = 1;
+            foreach(String aline in LineList)
+            {
+                if (row == 1)
+                {
+                    strVT = aline;
+                    VT = aline.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    String vt = "VT:" + aline;
+                    ListViewItem lvi = listView3.Items.Add(vt);
+                }
+                else if (row == 2)
+                {
+                    strVN = aline;
+                    VN = aline.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    String vt = "VN:" + aline;
+                    ListViewItem lvi = listView3.Items.Add(vt);
+                }
+                else if (row == 3)
+                {
+                    beginC = aline;
+                    String vt = "S:" + aline;
+                    ListViewItem lvi = listView3.Items.Add(vt);
+                    ListViewItem lv = listView3.Items.Add("Productions:");
+                }
+                else
+                {
+                    ListViewItem lvi = listView3.Items.Add(aline);
+                    grammar += aline + "\r\n";
+                    Production p = new Production();
+                    List<String> temp = new List<string>();
+                    temp = aline.Split(new string[] { "->" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    p.Left = temp[0];
+                    p.Right = temp[1];
+                    lp.Add(p);
+                    int lenth = temp[1].Length;
+                    for (int i = 0; i <= lenth; i++)
+                    {
+                        ClosureItem clo = new ClosureItem();
+                        clo.Left = temp[0];
+                        clo.Right = temp[1];
+                        clo.Dot = i;
+                        clo.Fromitem = row - 4;
+                        ClosureI.Add(clo);
+                    }
+                }
+                row++;
+            }
+
+            foreach (ClosureItem c in ClosureI)
+            {        
+                Console.WriteLine(c.getStrClo());
+            }
+        }
+        //获取某个项目集闭包
+        public List<ClosureItem> getClosure(ClosureItem clo)
+        {
+            List<ClosureItem> lco = new List<ClosureItem>();
+            lco.Add(clo);
+            int count = 0;
+            while (count != lco.Count)
+            {
+                count = lco.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    ClosureItem c1 = lco[i];
+                    String right = c1.Right;
+                    String a = "";
+                    int dot = c1.Dot;
+                    if (dot != c1.Right.Length)
+                        a = right[dot].ToString();
+                    foreach (ClosureItem key in ClosureI)
+                    {
+                        if (key.Left.Equals(a) && key.Dot == 0)
+                        {
+                            lco.Add(key);
+                        }
+                    }
+                }
+                lco = lco.Distinct().ToList(); //清除List中的相同项，只保留一个
+            }
+            return lco;
+        }
+        public Dictionary<string, List<ClosureItem>> getKind(Closure clo)
+        {
+            List<Closure> ln = new List<Closure>(); 
+            Dictionary<string,List<ClosureItem>> d = new Dictionary<string,List<ClosureItem>>();
+            List<string> l = new List<string>();
+            List<ClosureItem> cc = clo.Clo;
+            foreach(ClosureItem key in cc)
+            {
+                string right = key.Right;
+                if (key.Dot != right.Length)
+                {
+                    string a = right[key.Dot].ToString();
+                    l.Add(a);
+                }
+            }
+            l = l.Distinct().ToList();
+            foreach(String key in l)
+            {
+                List<ClosureItem> cc1 = new List<ClosureItem>(); 
+                foreach(ClosureItem item in cc)
+                {
+                    string right = item.Right;
+                    if (item.Dot != right.Length)
+                    {
+                        if (key.Equals(right[item.Dot].ToString()))
+                        {
+                            cc1.Add(item);
+                        }
+                    }
+                }
+                d.Add(key,cc1);
+            }
+            return d;
+        }
+        public void getAllClosure(ClosureItem firstclo)
+        {
+            Closure clo = new Closure();
+            List<ClosureItem> lc = new List<ClosureItem>();
+            lc = getClosure(firstclo);
+            clo.Clo = lc;
+            clo.Item = 0;
+            ClosureP.Add(clo);
+            int count = 0;
+            int item = 1;
+            while (count != ClosureP.Count)
+            {
+                count = ClosureP.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    Dictionary<string, List<ClosureItem>> begin = getKind(ClosureP[i]);
+                    List<String> f = begin.Keys.ToList();
+                    int count1 = ClosureP[i].Clo.Count;
+                    Dictionary<String, int> d = ClosureP[i].Dic;
+                    for (int j = 0; j < begin.Count; j++ )
+                    {
+                        Closure cc = new Closure();
+                        List<ClosureItem> lc1 = new List<ClosureItem>();
+                        String a = f[j];
+                        lc1 = begin[a];
+                        cc.Item = item;
+                        ClosureItem c = lc1[0];
+                        string  right = c.Right;
+                        int dot = c.Dot;
+                        Dictionary<string, int> dd = new Dictionary<string, int>();
+
+                        for (int m = 0; m < lc1.Count; m++)
+                        {
+                            ClosureItem ci = lc1[m];
+                            ClosureItem tclo1 = new ClosureItem();
+                            List<ClosureItem> lco = new List<ClosureItem>();
+                            tclo1.Left = ci.Left;
+                            tclo1.Right = ci.Right;
+                            tclo1.Dot = ci.Dot + 1;
+                            tclo1.Fromitem = ci.Fromitem;
+                            Console.WriteLine("the closure:");
+                            lco = getClosure(tclo1);
+                            foreach(ClosureItem key in lco)
+                            {
+                                String c2 = key.getStrClo();
+                                Console.WriteLine(c2);
+                            }
+                            cc.Clo.AddRange(lco);
+                            lco = cc.Clo.Distinct().ToList();
+                            cc.Clo = lco;
+                        }
+                        int n = 0;
+                        //判断状态是否已经存在
+                        for (; n < ClosureP.Count; n++)
+                        {
+                            Closure clo1 = ClosureP[n];
+                            if (clo1.equals(cc))
+                            {
+                                if (!ClosureP[i].Dic.ContainsKey(right[dot].ToString()))
+                                     ClosureP[i].Dic.Add(right[dot].ToString(), n);
+                                break;
+                            }
+                        }
+                        if (n == ClosureP.Count && !ClosureP[i].Dic.ContainsKey(right[dot].ToString()))
+                        {
+                            ClosureP[i].Dic.Add(right[dot].ToString(), item);
+                            ClosureP.Add(cc);
+                            item++;
+                        }
+                    }
+                }
+            }
+            String str = "";
+            foreach(Closure cl in ClosureP)
+            {
+                str += cl.getStrCLosure();
+            }
+            txtClosure.Text = str;
+        }
+        public void getLRTable()
+        {
+            List<string> vn1 = VN;
+            vn1.Remove(beginC);
+            for(int j = 0; j < ClosureP.Count; j++) //分析表初始化全部为error
+            {
+                Dictionary<string, string> s = new Dictionary<string, string>();
+                Table.Add(s);
+                foreach (string key in VT)
+                {
+                    Table[j].Add(key,"er");
+                }
+                foreach (string key in vn1)
+                {
+                    Table[j].Add(key,"er");
+                }
+            }
+            int i = 0;
+            foreach(Closure c in ClosureP)
+            {
+                Dictionary<string,int> d1 = c.Dic;
+                if (d1.Count == 0)
+                {
+                    if (c.Clo[0].Fromitem == 0) //是第一条产生式
+                    {
+                        Table[i]["#"] = "acc";
+                    }
+                    else
+                    {
+                        string r = "r";
+                        r += c.Clo[0].Fromitem;
+                        foreach (string key in VT)
+                        {
+                            Table[i][key] = r;
+                        }
+                    }
+                }
+                else
+                {
+                    foreach(string key in d1.Keys)
+                    {
+                        if(VN.Contains(key))
+                        {
+                            Table[i][key] = d1[key].ToString();
+                        }
+                        else if (VT.Contains(key))
+                        {
+                            string s = "s";
+                            s += d1[key].ToString();
+                            Table[i][key] = s;
+                        }
+                        else
+                        {
+                            MessageBox.Show("未知错误");
+                        }
+                    }
+                }
+                i++;
+            }
+
+        }
+        public void getSLRTable()
+        {
+            List<string> vn1 = VN;
+            vn1.Remove(beginC);
+            for (int j = 0; j < ClosureP.Count; j++) //分析表初始化全部为error
+            {
+                Dictionary<string, string> s = new Dictionary<string, string>();
+                Table.Add(s);
+                foreach (string key in VT)
+                {
+                    Table[j].Add(key, "er");
+                }
+                foreach (string key in vn1)
+                {
+                    Table[j].Add(key, "er");
+                }
+            }
+            int i = 0;
+            foreach (Closure c in ClosureP)
+            {
+                Dictionary<string, int> d1 = c.Dic;
+                if (d1.Count == 0)
+                {
+                    foreach (ClosureItem clo in c.Clo)
+                    {
+                        if (clo.Fromitem == 0) //是第一条产生式
+                        {
+                            Table[i]["#"] = "acc";
+                        }
+                        else
+                        {
+                            String left = clo.Left;
+                            string r = "r";
+                            r += clo.Fromitem;
+                            foreach (string key in VT)
+                            {
+                                List<String> lf = d_follow[left];
+                                if (lf.Contains(key))
+                                {
+                                    Table[i][key] = r;
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    foreach(ClosureItem clo in c.Clo)
+                    {
+                        if (clo.Dot == clo.Right.Length)
+                        {
+                            if (clo.Fromitem == 0) //是第一条产生式
+                            {
+                                Table[i]["#"] = "acc";
+                            }
+                            else
+                            {
+                                String left = clo.Left;
+                                string r = "r";
+                                r += clo.Fromitem;
+                                foreach (string key in VT)
+                                {
+                                    List<String> lf = d_follow[left];
+                                    if (lf.Contains(key))
+                                    {
+                                        Table[i][key] = r;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    foreach (string key in d1.Keys)
+                    {
+                        if (VN.Contains(key))
+                        {
+                            Table[i][key] = d1[key].ToString();
+                        }
+                        else if (VT.Contains(key))
+                        {
+                            string s = "s";
+                            s += d1[key].ToString();
+                            Table[i][key] = s;
+                        }
+                        else
+                        {
+                            MessageBox.Show("未知错误");
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+        public void clear()
+        {
+            lp = new List<Production>();
+            d_first = new Dictionary<string, List<string>>();
+            d_follow = new Dictionary<string, List<string>>();
+            Table  = new List<Dictionary<string, string>>();//表
+            ClosureI = new List<ClosureItem>();
+            ClosureP = new List<Closure>();
+            VN = new List<string>();
+            VT = new List<string>();
+            beginC = "";
+            grammar = "";
+            strVT = "";
+            strVN = "";
+        }
+        public void PrintTable()
+        {
+
+            listView2.Clear();
+            List<string> vn1 = VN;
+            vn1.Remove(beginC);
+            ColumnHeader ch = new ColumnHeader();
+            ch.Text = "状态";   //设置列标题  
+            ch.Width = 45;    //设置列宽度  
+            ch.TextAlign = HorizontalAlignment.Center;   //设置列的对齐方式  
+            
+            listView2.Columns.Add(ch);    //将列头添加到ListView控件。
+            foreach(string key in VT)
+            {
+                ColumnHeader ch1 = new ColumnHeader();
+                ch1.Text = key;   //设置列标题  
+                ch1.Width = 33;    //设置列宽度  
+                ch1.TextAlign = HorizontalAlignment.Left;   //设置列的对齐方式                
+                listView2.Columns.Add(ch1);    //将列头添加到ListView控件。
+            }
+            foreach (string key in vn1)
+            {
+                ColumnHeader ch1 = new ColumnHeader();
+                ch1.Text = key;   //设置列标题  
+                ch1.Width = 30;    //设置列宽度  
+                ch1.TextAlign = HorizontalAlignment.Left;   //设置列的对齐方式                
+                listView2.Columns.Add(ch1);    //将列头添加到ListView控件。
+            }
+            for (int j = 0; j < ClosureP.Count; j++) //遍历输出预测分析表
+            {
+                ListViewItem lvi = listView2.Items.Add(j.ToString());
+                foreach (string key in VT)
+                {
+                    lvi.SubItems.Add(Table[j][key]);
+                }
+                foreach (string key in vn1)
+                {
+                    lvi.SubItems.Add(Table[j][key]);
+                }
+            }
+        }
+        private void btnChooseFile_Click(object sender, EventArgs e)
+        {
+            clear();
+            OpenFileDialog fileDialog = new OpenFileDialog();
+            fileDialog.Multiselect = true;
+            fileDialog.Title = "请选择文件";
+            fileDialog.Filter = "所有文件(*.*)|*.*";
+            List<String> LineList = new List<String>(); 
+            if (fileDialog.ShowDialog() == DialogResult.OK)
+            {
+                string file = fileDialog.FileName;
+                StreamReader sr = File.OpenText(file);
+                String sLine = "";
+                String strFile = "";
+
+                while (sLine != null)
+                {
+                    sLine = sr.ReadLine();
+                    if (sLine != null && !sLine.Equals(""))
+                    {
+                        LineList.Add(sLine);
+                        strFile += sLine;
+                        strFile += "\r\n";
+                    }
+                }
+             }
+            try
+            {
+                getClosureItem(LineList);
+                getAllClosure(ClosureI[0]);
+                getLRTable();
+            }
+            catch
+            {
+                MessageBox.Show("文法输入错误，无法得到分析表,请检查确认文法为LR0文法");
+            }
+
+            PrintTable();
+        }
+
+        private void txtFile_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            String str = txtInput.Text;
+            str += "#";
+            Stack<string> sts = new Stack<string>();
+            Stack<string> ops = new Stack<string>();
+            sts.Push("0");
+            ops.Push("#");
+            listView1.Items.Clear();
+           
+            string right = str;
+            int i = 0;
+            Boolean flag = true;
+            ListViewItem lvi = listView1.Items.Add("0");
+            lvi.SubItems.Add("#");
+            lvi.SubItems.Add(right);
+            while(flag)
+            {
+                string current = str[i].ToString();
+                String topSts = sts.Peek();
+                int s = int.Parse(topSts);
+                String action = "";
+                try
+                {
+                    action = Table[s][current];
+                }
+                catch
+                {
+                    MessageBox.Show("无法识别该字符串");
+                    break;
+                }
+                if (action.Equals("er"))
+                {
+                    MessageBox.Show("无法识别该字符串");
+                    break;
+                }
+                else if (action.Equals("acc"))
+                {
+                    MessageBox.Show("匹配成功!");
+                    break;
+                }
+                else if(action[0].ToString().Equals("s"))
+                {
+                    String nexts = action.Remove(0, 1);
+                    sts.Push(nexts);
+                    ops.Push(current);
+                    right = right.Remove(0,1);
+                    i++;
+                }
+                else if(action[0].ToString().Equals("r"))
+                {
+                    int k = int.Parse(action.Remove(0,1).ToString());  //注意这里很可能错误
+                    String left = lp[k].Left;
+                    int n = lp[k].Right.Length;
+                    for (int count = 0; count < n; count++)
+                    {
+                        sts.Pop();
+                        ops.Pop();
+                    }
+                    ops.Push(left);
+                    String top = sts.Peek();
+                    int t = int.Parse(top);
+                    String new1 = Table[t][left];
+                    sts.Push(new1);
+                }
+                else
+                {
+                    MessageBox.Show("无法识别该字符串");
+                    break;
+                }
+
+                string strsts = "";
+                string strops = "";
+                List<string> aStack = sts.ToList();
+                List<string> bStack = ops.ToList();
+                for (int si = aStack.Count - 1; si >= 0; si--)
+                    strsts += aStack[si] + " ";               
+                for (int si = bStack.Count - 1; si >= 0; si--)
+                    strops += bStack[si];
+                ListViewItem lv = listView1.Items.Add(strsts);
+                lv.SubItems.Add(strops);
+                lv.SubItems.Add(right);
+            }
+
+=======
+﻿using System;
+using System.IO;
+
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace LR0
+{
+    public partial class Form1 : Form
+    {
+        public static List<Production> lp = new List<Production>();
+        public static Dictionary<string, List<string>> d_first = new Dictionary<string, List<string>>();
+        public static Dictionary<string, List<string>> d_follow = new Dictionary<string, List<string>>();
+        public static List<Dictionary<string, string>> Table = new List<Dictionary<string, string>>();//Action和GOTO表
+        public static List<ClosureItem> ClosureI = new List<ClosureItem>();
+        public static List<Closure> ClosureP = new List<Closure>();
+        public static List<String> VN;
+        public static List<String> VT;
+        public static String beginC;
+        public Form1()
+        {
+            InitializeComponent();
+>>>>>>> 6577faf1d7c951779fdf972adc06bc27fd00e806
+        }
+        String grammar = "";
+        String strVT = "";
+        String strVN = "";
+        enum TYPE
+        {
+            PROC, PROG, ID, BLOCK, CONDECL, VARDECL, BODY, CONST, INTEGER, STATEMENT, EXP, LEXP, LOP, TERM, AOP, FACTOR, MOP,
+            DOU, FEN, SPACE, LEFT_P, RIGHT_P,  //各种标号 逗号 分号
+            ADD, SUB, MUL, DIV,
+            N_EQUAL, EQUAL, LESS, LESS_E, BIG, BIG_E, //大于 小于
+            FUZHI,
+            L, D, // L字母  D数字
+            // 关键字
+            myconst, program, var, procedure, begin, end, myif, then, myelse, mydo, mywhile, call, read, write, repeat, unti,
+            
+        };
+
+        Dictionary<String, String> tmp = new Dictionary<String, string> { 
+        { ((char)TYPE.program).ToString(), "program" } ,
+        { ((char)TYPE.myconst).ToString(), "const" } ,
+        { ((char)TYPE.var).ToString(), "var" } ,
+        { ((char)TYPE.procedure).ToString(), "procedure" } ,
+        { ((char)TYPE.begin).ToString(), "begin" } ,
+        { ((char)TYPE.end).ToString(), "end" } ,
+        { ((char)TYPE.myif).ToString(), "if" } ,
+        { ((char)TYPE.then).ToString(), "then" } ,
+        { ((char)TYPE.myelse).ToString(), "else" } ,
+        { ((char)TYPE.mydo).ToString(), "do" } ,
+        { ((char)TYPE.mywhile).ToString(), "while" } ,
+        { ((char)TYPE.call).ToString(), "call" } ,
+        { ((char)TYPE.read).ToString(), "read" } ,
+        { ((char)TYPE.write).ToString(), "write" } ,
+        { ((char)TYPE.repeat).ToString(), "repeat" } ,
+        { ((char)TYPE.unti).ToString(), "unti" } ,
+
+        { ((char)TYPE.PROG).ToString(), "<prog>" } ,
+        { ((char)TYPE.PROC).ToString(), "<proc>" } ,
+        { ((char)TYPE.ID).ToString(), "<id>" } ,
+        { ((char)TYPE.BLOCK).ToString(), "<block>" } ,
+        { ((char)TYPE.CONDECL).ToString(), "<condecl>" } ,
+        { ((char)TYPE.VARDECL).ToString(), "<vardecl>" } ,
+        { ((char)TYPE.BODY).ToString(), "<body>" } ,
+        { ((char)TYPE.STATEMENT).ToString(), "<statement>" } ,
+        { ((char)TYPE.EXP).ToString(), "<exp>" } ,
+        { ((char)TYPE.CONST).ToString(), "<const>" } ,
+        { ((char)TYPE.INTEGER).ToString(), "<integer>" } ,
+        { ((char)TYPE.LEXP).ToString(), "<lexp>" } ,
+        { ((char)TYPE.LOP).ToString(), "<lop>" } ,
+        { ((char)TYPE.TERM).ToString(), "<term>" } ,
+        { ((char)TYPE.AOP).ToString(), "<aop>" } ,
+        { ((char)TYPE.FACTOR).ToString(), "<factor>" } ,
+        { ((char)TYPE.MOP).ToString(), "<mop>" } ,
+
+        { ((char)TYPE.SPACE).ToString(), " " } ,
+        { ((char)TYPE.DOU).ToString(), "," } ,
+        { ((char)TYPE.FEN).ToString(), ";" } ,
+        { ((char)TYPE.FUZHI).ToString(), ":=" } ,
+        { ((char)TYPE.ADD).ToString(), "+" } ,
+        { ((char)TYPE.SUB).ToString(), "-" } ,
+        { ((char)TYPE.MUL).ToString(), "*" } ,
+        { ((char)TYPE.DIV).ToString(), "/" } ,
+        { ((char)TYPE.LEFT_P).ToString(), "(" } ,
+        { ((char)TYPE.RIGHT_P).ToString(), ")" } ,
+        { ((char)TYPE.N_EQUAL).ToString(), "<>" } ,
+        { ((char)TYPE.EQUAL).ToString(), "=" } ,
+        { ((char)TYPE.LESS).ToString(), "<" } ,
+        { ((char)TYPE.LESS_E).ToString(), "<=" } ,
+        { ((char)TYPE.BIG).ToString(), ">" } ,
+        { ((char)TYPE.BIG_E).ToString(), ">=" } ,
+
+        { ((char)TYPE.L).ToString(), "l" } ,
+        { ((char)TYPE.D).ToString(), "d" } ,
+
+        { ((char)TYPE.PCONDECL).ToString(), "P<condecl>" } , 
+        { ((char)TYPE.NULL).ToString(), "$" } ,
+        { ((char)TYPE.PVARDECL).ToString(), "P<vardecl>" } ,
+        { ((char)TYPE.PM).ToString(), "Pm" } ,
+        { ((char)TYPE.PPROC).ToString(), "P<proc>" } ,
+        
+        };
+        List<String> pro = new List<string>{
+            ((char)TYPE.PROG).ToString() + "->" + ((char)TYPE.program).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.FEN).ToString() + ((char)TYPE.BLOCK).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+            ((char)TYPE.BLOCK).ToString() + "->" + ((char)TYPE.CONDECL).ToString() + ((char)TYPE.VARDECL).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.BODY).ToString(),
+
+            //<condecl> → const <const>{,<const>}
+            ((char)TYPE.CONDECL).ToString() + "->" + ((char)TYPE.myconst).ToString() + ((char)TYPE.CONST).ToString() + ((char)TYPE.PCONDECL).ToString(),
+            ((char)TYPE.PCONDECL).ToString() + "->" + ((char)TYPE.DOU).ToString() + ((char)TYPE.CONST).ToString() + ((char)TYPE.PCONDECL).ToString(),
+            ((char)TYPE.PCONDECL).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<const> → <id>:=<integer>
+            ((char)TYPE.CONST).ToString() + "->" + ((char)TYPE.ID).ToString() + ((char)TYPE.FUZHI).ToString() + ((char)TYPE.INTEGER).ToString(),
+
+            //<vardecl> → var <id>{,<id>}
+            ((char)TYPE.VARDECL).ToString() + "->" + ((char)TYPE.var).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.PVARDECL).ToString(),
+            ((char)TYPE.PVARDECL).ToString() + "->" + ((char)TYPE.DOU).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.PVARDECL).ToString(),
+            ((char)TYPE.PVARDECL).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            //<proc> → procedure <id>（[<id>{,<id>}]）;<block>{;<proc>}
+            ((char)TYPE.PROC).ToString() + "->" + ((char)TYPE.procedure).ToString() + ((char)TYPE.ID).ToString() + ((char)TYPE.LEFT_P).ToString() + ((char)TYPE.PM).ToString() + ((char)TYPE.RIGHT_P).ToString() + ((char)TYPE.FEN).ToString() + ((char)TYPE.BLOCK).ToString() + ((char)TYPE.PPROC).ToString(),
+            ((char)TYPE.PPROC).ToString() + "->" + ((char)TYPE.FEN).ToString() + ((char)TYPE.PROC).ToString() + ((char)TYPE.PPROC).ToString(),
+
+            //<integer> → d{d}
+            ((char)TYPE.INTEGER).ToString() + "->" + ((char)TYPE.D).ToString() + ((char)TYPE.PINTEGER).ToString(),
+            ((char)TYPE.PINTEGER).ToString() + "->" + ((char)TYPE.D).ToString() + ((char)TYPE.PINTEGER).ToString(),
+            ((char)TYPE.PINTEGER).ToString() + "->" + ((char)TYPE.NULL).ToString(),
+
+            
+        };
+        
+        //获取所有的项目，存储在 ClosureI 这个list中
+        public void getClosureItem(List<String> LineList)
+        {
+            for (int i = 0; i < pro[0].Length; i++)
+            {
+                String s = pro[0][i].ToString();
+                if ("-" == s || ">" == s)
+                {
+                    Console.WriteLine(i + " " + s);
+                }
+                else
+                    Console.WriteLine(i + ":" + tmp[s]);
+            }
+                
+            listView3.Clear();
+            ColumnHeader ch = new ColumnHeader();
+            ch.Text = "Syntax:";   //设置列标题  
+            ch.Width = 130;    //设置列宽度  
+            ch.TextAlign = HorizontalAlignment.Center;   //设置列的对齐方式  
+
+            listView3.Columns.Add(ch);    //将列头添加到ListView控件。
+            int row = 1;
+            foreach(String aline in LineList)
+            {
+                if (row == 1)
+                {
+                    strVT = aline;
+                    VT = aline.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    String vt = "VT:" + aline;
+                    ListViewItem lvi = listView3.Items.Add(vt);
+                }
+                else if (row == 2)
+                {
+                    strVN = aline;
+                    VN = aline.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    String vt = "VN:" + aline;
+                    ListViewItem lvi = listView3.Items.Add(vt);
+                }
+                else if (row == 3)
+                {
+                    beginC = aline;
+                    String vt = "S:" + aline;
+                    ListViewItem lvi = listView3.Items.Add(vt);
+                    ListViewItem lv = listView3.Items.Add("Productions:");
+                }
+                else
+                {
+                    ListViewItem lvi = listView3.Items.Add(aline);
+                    grammar += aline + "\r\n";
+                    Production p = new Production();
+                    List<String> temp = new List<string>();
+                    temp = aline.Split(new string[] { "->" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                    p.Left = temp[0];
+                    p.Right = temp[1];
+                    lp.Add(p);
+                    int lenth = temp[1].Length;
+                    for (int i = 0; i <= lenth; i++)
+                    {
+                        ClosureItem clo = new ClosureItem();
+                        clo.Left = temp[0];
+                        clo.Right = temp[1];
+                        clo.Dot = i;
+                        clo.Fromitem = row - 4;
+                        ClosureI.Add(clo);
+                    }
+                }
+                row++;
+            }
+
+            foreach (ClosureItem c in ClosureI)
+            {        
+                Console.WriteLine(c.getStrClo());
+            }
+        }
+        //获取某个项目集闭包
+        public List<ClosureItem> getClosure(ClosureItem clo)
+        {
+            List<ClosureItem> lco = new List<ClosureItem>();
+            lco.Add(clo);
+            int count = 0;
+            while (count != lco.Count)
+            {
+                count = lco.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    ClosureItem c1 = lco[i];
+                    String right = c1.Right;
+                    String a = "";
+                    int dot = c1.Dot;
+                    if (dot != c1.Right.Length)
+                        a = right[dot].ToString();
+                    foreach (ClosureItem key in ClosureI)
+                    {
+                        if (key.Left.Equals(a) && key.Dot == 0)
+                        {
+                            lco.Add(key);
+                        }
+                    }
+                }
+                lco = lco.Distinct().ToList(); //清除List中的相同项，只保留一个
+            }
+            return lco;
+        }
+        public Dictionary<string, List<ClosureItem>> getKind(Closure clo)
+        {
+            List<Closure> ln = new List<Closure>(); 
+            Dictionary<string,List<ClosureItem>> d = new Dictionary<string,List<ClosureItem>>();
+            List<string> l = new List<string>();
+            List<ClosureItem> cc = clo.Clo;
+            foreach(ClosureItem key in cc)
+            {
+                string right = key.Right;
+                if (key.Dot != right.Length)
+                {
+                    string a = right[key.Dot].ToString();
+                    l.Add(a);
+                }
+            }
+            l = l.Distinct().ToList();
+            foreach(String key in l)
+            {
+                List<ClosureItem> cc1 = new List<ClosureItem>(); 
+                foreach(ClosureItem item in cc)
+                {
+                    string right = item.Right;
+                    if (item.Dot != right.Length)
+                    {
+                        if (key.Equals(right[item.Dot].ToString()))
+                        {
+                            cc1.Add(item);
+                        }
+                    }
+                }
+                d.Add(key,cc1);
+            }
+            return d;
+        }
+        public void getAllClosure(ClosureItem firstclo)
+        {
+            Closure clo = new Closure();
+            List<ClosureItem> lc = new List<ClosureItem>();
+            lc = getClosure(firstclo);
+            clo.Clo = lc;
+            clo.Item = 0;
+            ClosureP.Add(clo);
+            int count = 0;
+            int item = 1;
+            while (count != ClosureP.Count)
+            {
+                count = ClosureP.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    Dictionary<string, List<ClosureItem>> begin = getKind(ClosureP[i]);
+                    List<String> f = begin.Keys.ToList();
+                    int count1 = ClosureP[i].Clo.Count;
+                    Dictionary<String, int> d = ClosureP[i].Dic;
+                    for (int j = 0; j < begin.Count; j++ )
+                    {
+                        Closure cc = new Closure();
+                        List<ClosureItem> lc1 = new List<ClosureItem>();
+                        String a = f[j];
+                        lc1 = begin[a];
+                        cc.Item = item;
+                        ClosureItem c = lc1[0];
+                        string  right = c.Right;
+                        int dot = c.Dot;
+                        Dictionary<string, int> dd = new Dictionary<string, int>();
+
+                        for (int m = 0; m < lc1.Count; m++)
+                        {
+                            ClosureItem ci = lc1[m];
+                            ClosureItem tclo1 = new ClosureItem();
+                            List<ClosureItem> lco = new List<ClosureItem>();
+                            tclo1.Left = ci.Left;
+                            tclo1.Right = ci.Right;
+                            tclo1.Dot = ci.Dot + 1;
+                            tclo1.Fromitem = ci.Fromitem;
+                            Console.WriteLine("the closure:");
+                            lco = getClosure(tclo1);
+                            foreach(ClosureItem key in lco)
+                            {
+                                String c2 = key.getStrClo();
+                                Console.WriteLine(c2);
+                            }
+                            cc.Clo.AddRange(lco);
+                            lco = cc.Clo.Distinct().ToList();
+                            cc.Clo = lco;
+                        }
+                        int n = 0;
+                        //判断状态是否已经存在
+                        for (; n < ClosureP.Count; n++)
+                        {
+                            Closure clo1 = ClosureP[n];
+                            if (clo1.equals(cc))
+                            {
+                                if (!ClosureP[i].Dic.ContainsKey(right[dot].ToString()))
+                                     ClosureP[i].Dic.Add(right[dot].ToString(), n);
+                                break;
+                            }
+                        }
+                        if (n == ClosureP.Count && !ClosureP[i].Dic.ContainsKey(right[dot].ToString()))
+                        {
+                            ClosureP[i].Dic.Add(right[dot].ToString(), item);
+                            ClosureP.Add(cc);
+                            item++;
+                        }
+                    }
+                }
+            }
+            String str = "";
+            foreach(Closure cl in ClosureP)
+            {
+                str += cl.getStrCLosure();
+            }
+            txtClosure.Text = str;
+        }
+        public void getLRTable()
+        {
+            List<string> vn1 = VN;
+            vn1.Remove(beginC);
+            for(int j = 0; j < ClosureP.Count; j++) //分析表初始化全部为error
+            {
+                Dictionary<string, string> s = new Dictionary<string, string>();
+                Table.Add(s);
+                foreach (string key in VT)
+                {
+                    Table[j].Add(key,"er");
+                }
+                foreach (string key in vn1)
+                {
+                    Table[j].Add(key,"er");
+                }
+            }
+            int i = 0;
+            foreach(Closure c in ClosureP)
+            {
+                Dictionary<string,int> d1 = c.Dic;
+                if (d1.Count == 0)
+                {
+                    if (c.Clo[0].Fromitem == 0) //是第一条产生式
+                    {
+                        Table[i]["#"] = "acc";
+                    }
+                    else
+                    {
+                        string r = "r";
+                        r += c.Clo[0].Fromitem;
+                        foreach (string key in VT)
+                        {
+                            Table[i][key] = r;
+                        }
+                    }
+                }
+                else
+                {
+                    foreach(string key in d1.Keys)
+                    {
+                        if(VN.Contains(key))
+                        {
+                            Table[i][key] = d1[key].ToString();
+                        }
+                        else if (VT.Contains(key))
+                        {
+                            string s = "s";
+                            s += d1[key].ToString();
+                            Table[i][key] = s;
+                        }
+                        else
+                        {
+                            MessageBox.Show("未知错误");
+                        }
+                    }
+                }
+                i++;
+            }
+
+        }
+        public void getSLRTable()
+        {
+            List<string> vn1 = VN;
+            vn1.Remove(beginC);
+            for (int j = 0; j < ClosureP.Count; j++) //分析表初始化全部为error
+            {
+                Dictionary<string, string> s = new Dictionary<string, string>();
+                Table.Add(s);
+                foreach (string key in VT)
+                {
+                    Table[j].Add(key, "er");
+                }
+                foreach (string key in vn1)
+                {
+                    Table[j].Add(key, "er");
+                }
+            }
+            int i = 0;
+            foreach (Closure c in ClosureP)
+            {
+                Dictionary<string, int> d1 = c.Dic;
+                if (d1.Count == 0)
+                {
+                    foreach (ClosureItem clo in c.Clo)
+                    {
+                        if (clo.Fromitem == 0) //是第一条产生式
+                        {
+                            Table[i]["#"] = "acc";
+                        }
+                        else
+                        {
+                            String left = clo.Left;
+                            string r = "r";
+                            r += clo.Fromitem;
+                            foreach (string key in VT)
+                            {
+                                List<String> lf = d_follow[left];
+                                if (lf.Contains(key))
+                                {
+                                    Table[i][key] = r;
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    foreach(ClosureItem clo in c.Clo)
+                    {
+                        if (clo.Dot == clo.Right.Length)
+                        {
+                            if (clo.Fromitem == 0) //是第一条产生式
+                            {
+                                Table[i]["#"] = "acc";
+                            }
+                            else
+                            {
+                                String left = clo.Left;
+                                string r = "r";
+                                r += clo.Fromitem;
+                                foreach (string key in VT)
+                                {
+                                    List<String> lf = d_follow[left];
+                                    if (lf.Contains(key))
+                                    {
+                                        Table[i][key] = r;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    foreach (string key in d1.Keys)
+                    {
+                        if (VN.Contains(key))
+                        {
+                            Table[i][key] = d1[key].ToString();
+                        }
+                        else if (VT.Contains(key))
+                        {
+                            string s = "s";
+                            s += d1[key].ToString();
+                            Table[i][key] = s;
+                        }
+                        else
+                        {
+                            MessageBox.Show("未知错误");
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+        public void clear()
+        {
+            lp = new List<Production>();
+            d_first = new Dictionary<string, List<string>>();
+            d_follow = new Dictionary<string, List<string>>();
+            Table  = new List<Dictionary<string, string>>();//表
+            ClosureI = new List<ClosureItem>();
+            ClosureP = new List<Closure>();
+            VN = new List<string>();
+            VT = new List<string>();
+            beginC = "";
+            grammar = "";
+            strVT = "";
+            strVN = "";
+        }
+        public void PrintTable()
+        {
+
+            listView2.Clear();
+            List<string> vn1 = VN;
+            vn1.Remove(beginC);
+            ColumnHeader ch = new ColumnHeader();
+            ch.Text = "状态";   //设置列标题  
+            ch.Width = 45;    //设置列宽度  
+            ch.TextAlign = HorizontalAlignment.Center;   //设置列的对齐方式  
+            
+            listView2.Columns.Add(ch);    //将列头添加到ListView控件。
+            foreach(string key in VT)
+            {
+                ColumnHeader ch1 = new ColumnHeader();
+                ch1.Text = key;   //设置列标题  
+                ch1.Width = 33;    //设置列宽度  
+                ch1.TextAlign = HorizontalAlignment.Left;   //设置列的对齐方式                
+                listView2.Columns.Add(ch1);    //将列头添加到ListView控件。
+            }
+            foreach (string key in vn1)
+            {
+                ColumnHeader ch1 = new ColumnHeader();
+                ch1.Text = key;   //设置列标题  
+                ch1.Width = 30;    //设置列宽度  
+                ch1.TextAlign = HorizontalAlignment.Left;   //设置列的对齐方式                
+                listView2.Columns.Add(ch1);    //将列头添加到ListView控件。
+            }
+            for (int j = 0; j < ClosureP.Count; j++) //遍历输出预测分析表
+            {
+                ListViewItem lvi = listView2.Items.Add(j.ToString());
+                foreach (string key in VT)
+                {
+                    lvi.SubItems.Add(Table[j][key]);
+                }
+                foreach (string key in vn1)
+                {
+                    lvi.SubItems.Add(Table[j][key]);
+                }
+            }
+        }
+        private void btnChooseFile_Click(object sender, EventArgs e)
+        {
+            clear();
+            OpenFileDialog fileDialog = new OpenFileDialog();
+            fileDialog.Multiselect = true;
+            fileDialog.Title = "请选择文件";
+            fileDialog.Filter = "所有文件(*.*)|*.*";
+            List<String> LineList = new List<String>(); 
+            if (fileDialog.ShowDialog() == DialogResult.OK)
+            {
+                string file = fileDialog.FileName;
+                StreamReader sr = File.OpenText(file);
+                String sLine = "";
+                String strFile = "";
+
+                while (sLine != null)
+                {
+                    sLine = sr.ReadLine();
+                    if (sLine != null && !sLine.Equals(""))
+                    {
+                        LineList.Add(sLine);
+                        strFile += sLine;
+                        strFile += "\r\n";
+                    }
+                }
+             }
+            try
+            {
+                getClosureItem(LineList);
+                getAllClosure(ClosureI[0]);
+                getLRTable();
+            }
+            catch
+            {
+                MessageBox.Show("文法输入错误，无法得到分析表,请检查确认文法为LR0文法");
+            }
+
+            PrintTable();
+        }
+
+        private void txtFile_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            String str = txtInput.Text;
+            str += "#";
+            Stack<string> sts = new Stack<string>();
+            Stack<string> ops = new Stack<string>();
+            sts.Push("0");
+            ops.Push("#");
+            listView1.Items.Clear();
+           
+            string right = str;
+            int i = 0;
+            Boolean flag = true;
+            ListViewItem lvi = listView1.Items.Add("0");
+            lvi.SubItems.Add("#");
+            lvi.SubItems.Add(right);
+            while(flag)
+            {
+                string current = str[i].ToString();
+                String topSts = sts.Peek();
+                int s = int.Parse(topSts);
+                String action = "";
+                try
+                {
+                    action = Table[s][current];
+                }
+                catch
+                {
+                    MessageBox.Show("无法识别该字符串");
+                    break;
+                }
+                if (action.Equals("er"))
+                {
+                    MessageBox.Show("无法识别该字符串");
+                    break;
+                }
+                else if (action.Equals("acc"))
+                {
+                    MessageBox.Show("匹配成功!");
+                    break;
+                }
+                else if(action[0].ToString().Equals("s"))
+                {
+                    String nexts = action.Remove(0, 1);
+                    sts.Push(nexts);
+                    ops.Push(current);
+                    right = right.Remove(0,1);
+                    i++;
+                }
+                else if(action[0].ToString().Equals("r"))
+                {
+                    int k = int.Parse(action.Remove(0,1).ToString());  //注意这里很可能错误
+                    String left = lp[k].Left;
+                    int n = lp[k].Right.Length;
+                    for (int count = 0; count < n; count++)
+                    {
+                        sts.Pop();
+                        ops.Pop();
+                    }
+                    ops.Push(left);
+                    String top = sts.Peek();
+                    int t = int.Parse(top);
+                    String new1 = Table[t][left];
+                    sts.Push(new1);
+                }
+                else
+                {
+                    MessageBox.Show("无法识别该字符串");
+                    break;
+                }
+
+                string strsts = "";
+                string strops = "";
+                List<string> aStack = sts.ToList();
+                List<string> bStack = ops.ToList();
+                for (int si = aStack.Count - 1; si >= 0; si--)
+                    strsts += aStack[si] + " ";               
+                for (int si = bStack.Count - 1; si >= 0; si--)
+                    strops += bStack[si];
+                ListViewItem lv = listView1.Items.Add(strsts);
+                lv.SubItems.Add(strops);
+                lv.SubItems.Add(right);
+            }
+
+        }
+        private void button3_Click(object sender, EventArgs e)
+        {//词法分析的点击事件
+            label7.Text = textBox1.Text;
+        }
+        private void txtClosure_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            clear();
+            OpenFileDialog fileDialog = new OpenFileDialog();
+            fileDialog.Multiselect = true;
+            fileDialog.Title = "请选择文件";
+            fileDialog.Filter = "所有文件(*.*)|*.*";
+            List<String> LineList = new List<String>();
+            if (fileDialog.ShowDialog() == DialogResult.OK)
+            {
+                string file = fileDialog.FileName;
+                StreamReader sr = File.OpenText(file);
+                String sLine = "";
+                String strFile = "";
+
+                while (sLine != null)
+                {
+                    sLine = sr.ReadLine();
+                    if (sLine != null && !sLine.Equals(""))
+                    {
+                        LineList.Add(sLine);
+                        strFile += sLine;
+                        strFile += "\r\n";
+                    }
+                }
+            }
+            try
+            {
+                getClosureItem(LineList);
+                getAllClosure(ClosureI[0]);
+                d_first = getFirst.get_First(grammar, strVT, strVN, beginC);
+                d_follow = getFollow.get_Follow(grammar, strVT, strVN, beginC);
+                getSLRTable();
+        
+            }
+            catch
+            {
+                MessageBox.Show("文法输入错误，无法得到分析表,请检查确认文法为LR0文法");
+            }
+            PrintTable();
+        }
+
+        private void listView1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void listView2_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void txtInput_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void textBox1_TextChanged_1(object sender, EventArgs e)
+        {
+
+        }
+
+    }
+}
